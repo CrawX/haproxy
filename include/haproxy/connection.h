@@ -337,6 +337,7 @@ static inline void conn_init(struct connection *conn, void *target)
 	conn->dst = NULL;
 	conn->proxy_authority = NULL;
 	conn->proxy_unique_id = IST_NULL;
+	conn->proxy_aws_vpce_id = IST_NULL;
 }
 
 /* sets <owner> as the connection's owner */
@@ -494,6 +495,11 @@ static inline void conn_free(struct connection *conn)
 		pool_free(pool_head_uniqueid, conn->proxy_unique_id.ptr);
 		conn->proxy_unique_id = IST_NULL;
 	}
+
+	if (isttest(conn->proxy_unique_id)) {
+        pool_free(pool_head_uniqueid, istptr(conn->proxy_aws_vpce_id));
+        conn->proxy_aws_vpce_id = IST_NULL;
+    }
 
 	/* By convention we always place a NULL where the ctx points to if the
 	 * mux is null. It may have been used to store the connection as a

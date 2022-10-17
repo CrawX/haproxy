@@ -1,0 +1,36 @@
+varnishtest "Check that we are able to read a aws vpce id from PROXYv2"
+
+feature ignore_unknown_macro
+
+haproxy h1 -conf {
+    defaults
+        mode http
+        timeout connect 1s
+        timeout client  1s
+        timeout server  1s
+
+    frontend echo
+        bind "fd@${fe1}" accept-proxy
+        http-after-response set-header echo %[fc_pp_aws_vpce_id]
+        http-request return status 200
+} -start
+
+client c1 -connect ${h1_fe1_sock} {
+    # PROXY v2 signature
+    sendhex "0d 0a 0d 0a 00 0d 0a 51 55 49 54 0a"
+    # version + PROXY
+    sendhex "21"
+    # TCP4
+    sendhex "11"
+    # length of the address (12) + length of the TLV (15)
+    sendhex "00 1B"
+    # 127.0.0.1 42 127.0.0.1 1337
+    sendhex "7F 00 00 01 7F 00 00 01 00 2A 05 39"
+    # PP2_TYPE_AWS + length of the value + PP2_SUBTYPE_AWS_VPCE_ID + "aws-vpce-id"
+    sendhex "EA 00 0C 01 61 77 73 2D 76 70 63 65 2D 69 64"
+
+    txreq -url "/"
+    rxresp
+    expect resp.status == 200
+    expect resp.http.echo == "aws-vpce-id"
+} -run
