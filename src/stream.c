@@ -64,6 +64,7 @@
 
 DECLARE_POOL(pool_head_stream, "stream", sizeof(struct stream));
 DECLARE_POOL(pool_head_uniqueid, "uniqueid", UNIQUEID_LEN);
+DECLARE_POOL(pool_head_aws_vpce_id, "awsvpcid", PP2_AWS_MAX);
 
 /* incremented by each "show sess" to fix a delimiter between streams */
 unsigned stream_epoch = 0;

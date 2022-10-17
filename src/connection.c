@@ -433,6 +433,7 @@ void conn_init(struct connection *conn, void *target)
 	conn->dst = NULL;
 	conn->proxy_authority = IST_NULL;
 	conn->proxy_unique_id = IST_NULL;
+	conn->proxy_aws_vpce_id = IST_NULL;
 	conn->hash_node = NULL;
 	conn->xprt = NULL;
 }
@@ -497,6 +498,9 @@ void conn_free(struct connection *conn)
 
 	pool_free(pool_head_uniqueid, istptr(conn->proxy_unique_id));
 	conn->proxy_unique_id = IST_NULL;
+
+	pool_free(pool_head_uniqueid, istptr(conn->proxy_aws_vpce_id));
+   	conn->proxy_aws_vpce_id = IST_NULL;
 
 	pool_free(pool_head_conn_hash_node, conn->hash_node);
 	conn->hash_node = NULL;
@@ -1082,6 +1086,23 @@ int conn_recv_proxy(struct connection *conn, int flag)
 				}
 				break;
 			}
+            case PP2_TYPE_AWS: {
+                if (istlen(tlv) > PP2_AWS_MAX || istlen(tlv) == 0)
+                    goto bad_header;
+                /* Check for PP2_SUBTYPE_AWS_VPCE_ID, ignore everything else */
+                if (istptr(tlv)[0] == PP2_SUBTYPE_AWS_VPCE_ID) {
+                    conn->proxy_aws_vpce_id = ist2(pool_alloc(pool_head_uniqueid), 0);
+                    if (!isttest(conn->proxy_aws_vpce_id))
+                        goto fail;
+                    /* Skip the first byte in the copy to remove the SUBTYPE prefix) */
+                    if (istcpy(&conn->proxy_aws_vpce_id, istadv(tlv, 1), PP2_AWS_MAX) < 0) {
+                        /* This is impossible, because we verified that the TLV value fits. */
+                        my_unreachable();
+                        goto fail;
+                    }
+                }
+                break;
+            }
 			default:
 				break;
 			}
@@ -2203,6 +2224,31 @@ int smp_fetch_fc_pp_unique_id(const struct arg *args, struct sample *smp, const 
 	return 1;
 }
 
+/* fetch the AWS VPCE ID subtype from the AWS TLV from a PROXY protocol header */
+int smp_fetch_fc_pp_aws_vpce_id(const struct arg *args, struct sample *smp, const char *kw, void *private)
+{
+	struct connection *conn;
+
+	conn = objt_conn(smp->sess->origin);
+	if (!conn)
+		return 0;
+
+	if (conn->flags & CO_FL_WAIT_XPRT) {
+		smp->flags |= SMP_F_MAY_CHANGE;
+		return 0;
+	}
+
+	if (!isttest(conn->proxy_aws_vpce_id))
+		return 0;
+
+	smp->flags = 0;
+	smp->data.type = SMP_T_STR;
+	smp->data.u.str.area = istptr(conn->proxy_aws_vpce_id);
+	smp->data.u.str.data = istlen(conn->proxy_aws_vpce_id);
+
+	return 1;
+}
+
 /* fetch the error code of a connection */
 int smp_fetch_fc_err(const struct arg *args, struct sample *smp, const char *kw, void *private)
 {
@@ -2277,6 +2323,7 @@ static struct sample_fetch_kw_list sample_fetch_keywords = {ILH, {
 	{ "fc_rcvd_proxy", smp_fetch_fc_rcvd_proxy, 0, NULL, SMP_T_BOOL, SMP_USE_L4CLI },
 	{ "fc_pp_authority", smp_fetch_fc_pp_authority, 0, NULL, SMP_T_STR, SMP_USE_L4CLI },
 	{ "fc_pp_unique_id", smp_fetch_fc_pp_unique_id, 0, NULL, SMP_T_STR, SMP_USE_L4CLI },
+	{ "fc_pp_aws_vpce_id", smp_fetch_fc_pp_aws_vpce_id, 0, NULL, SMP_T_STR, SMP_USE_L4CLI },
 	{ /* END */ },
 }};
 

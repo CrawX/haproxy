@@ -538,6 +538,7 @@ struct connection {
 	struct sockaddr_storage *dst; /* destination address (pool), when known, otherwise NULL */
 	struct ist proxy_authority;   /* Value of the authority TLV received via PROXYv2 */
 	struct ist proxy_unique_id;   /* Value of the unique ID TLV received via PROXYv2 */
+	struct ist proxy_aws_vpce_id;   /* Value of the AWS TLV, subtype VPCE ID received via PROXYv2 */
 
 	/* used to identify a backend connection for http-reuse,
 	 * thus only present if conn.target is of type OBJ_TYPE_SERVER
@@ -603,12 +604,14 @@ struct mux_proto_list {
 #define PP2_TYPE_CRC32C         0x03
 #define PP2_TYPE_NOOP           0x04
 #define PP2_TYPE_UNIQUE_ID      0x05
+#define PP2_TYPE_AWS            0xEA
 #define PP2_TYPE_SSL            0x20
 #define PP2_SUBTYPE_SSL_VERSION 0x21
 #define PP2_SUBTYPE_SSL_CN      0x22
 #define PP2_SUBTYPE_SSL_CIPHER  0x23
 #define PP2_SUBTYPE_SSL_SIG_ALG 0x24
 #define PP2_SUBTYPE_SSL_KEY_ALG 0x25
+#define PP2_SUBTYPE_AWS_VPCE_ID 0x01
 #define PP2_TYPE_NETNS          0x30
 
 #define PP2_CLIENT_SSL           0x01
@@ -617,6 +620,9 @@ struct mux_proto_list {
 
 /* Max length of the authority TLV */
 #define PP2_AUTHORITY_MAX 255
+
+/* Max length of the AWS TLV */
+#define PP2_AWS_MAX 255
 
 #define TLV_HEADER_SIZE      3
 
